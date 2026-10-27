@@ -31,15 +31,22 @@ export function PadView({ padId }: { padId: string }) {
     });
   }, [creds, padId]);
 
+  const minutes = pad ? Math.max(0, Math.floor((pad.info.expiresAt - now) / 60_000)) : 0;
+  const left = minutes >= 60 ? `${Math.floor(minutes / 60)}h ${minutes % 60}m` : `${minutes}m`;
+  const title = pad && !gone && now <= pad.info.expiresAt ? `${left} · scratchd` : 'scratchd';
+  useEffect(() => {
+    document.title = title;
+    return () => void (document.title = 'scratchd');
+  }, [title]);
+
   if (pad && now > pad.info.expiresAt) return <Message>This pad expired.</Message>;
   if (gone) return <Message>{gone}</Message>;
   if (!pad || !creds) return <Shell />;
 
-  const minutes = Math.max(0, Math.floor((pad.info.expiresAt - now) / 60_000));
   return (
     <Shell>
       <main className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 pt-0 md:grid-cols-2 md:grid-rows-[minmax(0,1fr)]">
-        <Item creds={creds} info={pad.info} meta={pad.meta} uploadError={uploadError} left={`${Math.floor(minutes / 60)}h ${minutes % 60}m left`} />
+        <Item creds={creds} info={pad.info} meta={pad.meta} uploadError={uploadError} left={`${left} left`} />
         <SharePanel creds={creds} startOpen={freshPads.has(padId)} />
       </main>
     </Shell>
@@ -116,7 +123,7 @@ function Item({ creds, info, meta, uploadError, left }: { creds: Creds; info: Pa
         ) : html ? (
           <div className="prose prose-neutral dark:prose-invert prose-code:before:content-none prose-code:after:content-none w-full max-w-none self-start" dangerouslySetInnerHTML={{ __html: html }} />
         ) : text !== null ? (
-          <pre className="w-full self-start font-mono text-sm break-words whitespace-pre-wrap">{text}</pre>
+          <pre className="w-full self-start font-mono text-base break-words whitespace-pre-wrap">{text}</pre>
         ) : url && kind === 'image' ? (
           <img src={url} alt={meta.name} className="max-h-[60vh] max-w-full rounded-lg object-contain" />
         ) : blob && kind === 'pdf' ? (

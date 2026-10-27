@@ -25,6 +25,7 @@ export function SharePanel({ creds, startOpen }: { creds: Creds; startOpen: bool
   const [round, setRound] = useState(0); // bump for a fresh code
   const [share, setShare] = useState<Share | null>(null);
   const [making, setMaking] = useState(false);
+  const [showQr, setShowQr] = useState(false);
   const [error, setError] = useState('');
   const idleRefreshes = useRef(0);
   const now = useNow(1000);
@@ -83,8 +84,16 @@ export function SharePanel({ creds, startOpen }: { creds: Creds; startOpen: bool
             <p className="text-muted">On the other device, enter</p>
             <div className={`flex flex-col items-center gap-5 transition-opacity ${making ? 'opacity-30' : ''}`} aria-busy={making}>
               <output className="font-mono text-4xl font-medium tracking-[0.12em] sm:text-5xl">{formatCode(share.code)}</output>
-              <QR value={`${location.origin}/#c=${share.code}`} />
+              {/* On a phone the QR would crowd out the item, so it waits for a tap. */}
+              <div className={showQr ? '' : 'hidden md:block'}>
+                <QR value={`${location.origin}/#c=${share.code}`} />
+              </div>
             </div>
+            {!showQr && (
+              <button className="text-sm text-muted underline underline-offset-4 hover:text-ink md:hidden" onClick={() => setShowQr(true)}>
+                Show QR code
+              </button>
+            )}
             <p className="text-sm text-muted tabular-nums">
               {making
                 ? error || 'Making a new code…'
@@ -93,7 +102,11 @@ export function SharePanel({ creds, startOpen }: { creds: Creds; startOpen: bool
           </>
         )}
       </div>
-      <div className="flex justify-end border-t border-line p-3">
+      <div className="flex justify-between border-t border-line p-3">
+        {/* The current pad stays open in this tab's history; Back returns to it. */}
+        <button className="btn" onClick={() => navigate('/')}>
+          New pad
+        </button>
         <DeleteButton creds={creds} />
       </div>
     </section>

@@ -4,5 +4,6 @@ import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  server: { proxy: { '/api': 'http://localhost:3000' } },
+  // Polling: the native watcher on Windows sometimes misses edits and serves stale modules.
+  server: { proxy: { '/api': 'http://localhost:3000' }, watch: { usePolling: true, interval: 300 } },
 });

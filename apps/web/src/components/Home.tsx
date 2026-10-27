@@ -68,7 +68,7 @@ function Upload() {
           onChange={(e) => setText(e.target.value)}
           placeholder="Type or paste text"
           aria-label="Text to share"
-          className="min-h-0 flex-1 resize-none bg-transparent p-5 font-mono text-[15px] outline-none placeholder:text-muted"
+          className="min-h-0 flex-1 resize-none bg-transparent p-5 font-mono text-base outline-none placeholder:text-muted"
         />
         <div className="flex items-center justify-between gap-3 border-t border-line p-3">
           <button className="btn" onClick={() => setWriting(false)}>
@@ -85,7 +85,7 @@ function Upload() {
 
   return (
     <section
-      className={`panel relative flex flex-col border-dashed transition-colors has-[:focus-visible]:border-accent ${drag ? 'border-accent bg-accent/5' : ''}`}
+      className={`panel flex flex-col border-dashed transition-colors has-[:focus-visible]:border-accent ${drag ? 'border-accent bg-accent/5' : ''}`}
       onDragOver={(e) => (e.preventDefault(), setDrag(true))}
       onDragLeave={() => setDrag(false)}
       onDrop={(e) => {
@@ -113,6 +113,7 @@ function Upload() {
         <span className="text-muted pointer-coarse:hidden">
           or <span className="text-ink underline underline-offset-4">browse</span>
         </span>
+        <span className="text-sm text-muted">1GB max</span>
         <span className="mt-4 flex items-center gap-1.5 text-sm pointer-coarse:hidden">
           <kbd className="rounded-md border border-line bg-paper px-1.5 py-0.5 font-mono text-xs">{MOD_KEY}</kbd>
           <kbd className="rounded-md border border-line bg-paper px-1.5 py-0.5 font-mono text-xs">V</kbd>
@@ -120,7 +121,6 @@ function Upload() {
         </span>
         {error && <span className="text-sm text-accent">{error}</span>}
       </label>
-      <span className="absolute top-4 right-5 text-xs text-muted">1GB max</span>
       <button className="mb-4 self-center text-sm text-muted underline underline-offset-4 hover:text-ink" onClick={() => setWriting(true)}>
         Write text instead
       </button>

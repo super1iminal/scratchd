@@ -28,8 +28,14 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-accent: var(--accent);
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+
+/* Scales every rem-based size (text, buttons, spacing) together; a percentage keeps the
+   reader's own browser font setting in play. */
+html {
+  font-size: 112.5%;
 }
 
 body {
@@ -42,7 +48,7 @@ body {
   @apply rounded-2xl border border-line bg-raised;
 }
 @utility btn {
-  @apply inline-flex h-10 items-center justify-center rounded-lg border border-line px-4 text-sm font-medium transition-colors hover:border-ink disabled:pointer-events-none disabled:opacity-40;
+  @apply inline-flex h-12 items-center justify-center rounded-xl border border-line bg-ink/8 px-6 text-base font-medium md:h-14 md:px-8 md:text-lg transition-colors hover:border-ink disabled:pointer-events-none disabled:opacity-40;
 }
 @utility btn-primary {
   @apply btn border-ink bg-ink text-paper hover:opacity-85;

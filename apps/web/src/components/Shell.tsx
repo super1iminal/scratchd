@@ -3,12 +3,13 @@ import { navigate } from '../lib/ui';
 
 export function Shell({ children }: { children?: ReactNode }) {
   return (
-    <div className="flex h-dvh flex-col">
+    // Capped width: on wide screens full-width panels leave their content stranded.
+    <div className="mx-auto flex h-dvh w-full max-w-6xl flex-col">
       <header className="flex h-14 shrink-0 items-center px-5">
         <a
           href="/"
           onClick={(e) => (e.preventDefault(), navigate('/'))}
-          className="font-mono text-[15px] font-semibold tracking-tight"
+          className="font-mono text-base font-semibold tracking-tight"
         >
           scratchd
         </a>
