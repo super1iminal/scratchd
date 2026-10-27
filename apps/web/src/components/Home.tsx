@@ -9,6 +9,8 @@ import { Shell } from './Shell';
 // Pads created in this tab open with the share code already showing.
 export const freshPads = new Set<string>();
 
+const MOD_KEY = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
+
 export function Home() {
   return (
     <Shell>
@@ -103,16 +105,22 @@ function Upload() {
             'Encrypting…'
           ) : (
             <>
-              <span className="pointer-coarse:hidden">Drop a file or click</span>
+              <span className="pointer-coarse:hidden">Drag and drop a file</span>
               <span className="hidden pointer-coarse:inline">Choose a file</span>
             </>
           )}
         </span>
-        <span className="text-muted">
-          <span className="pointer-coarse:hidden">or paste anything · </span>up to 1 GB
+        <span className="text-muted pointer-coarse:hidden">
+          or <span className="text-ink underline underline-offset-4">browse</span>
+        </span>
+        <span className="mt-4 flex items-center gap-1.5 text-sm pointer-coarse:hidden">
+          <kbd className="rounded-md border border-line bg-paper px-1.5 py-0.5 font-mono text-xs">{MOD_KEY}</kbd>
+          <kbd className="rounded-md border border-line bg-paper px-1.5 py-0.5 font-mono text-xs">V</kbd>
+          <span className="text-muted">to paste text or an image</span>
         </span>
         {error && <span className="text-sm text-accent">{error}</span>}
       </label>
+      <span className="absolute top-4 right-5 text-xs text-muted">1GB max</span>
       <button className="mb-4 self-center text-sm text-muted underline underline-offset-4 hover:text-ink" onClick={() => setWriting(true)}>
         Write text instead
       </button>
@@ -144,6 +152,7 @@ function CodeEntry() {
     const c = normalizeCode(value);
     setCode(c);
     setMessage('');
+    setFailed(false);
     if (c.length === CODE_LENGTH) join(c);
   }
 
@@ -164,12 +173,12 @@ function CodeEntry() {
         id="code"
         value={formatCode(code)}
         onChange={(e) => change(e.target.value)}
-        disabled={joining}
+        readOnly={joining} // not disabled: that would drop focus, and a typo should be fixable in place
         placeholder="XXXX-XXXX"
         autoComplete="off"
         autoCapitalize="characters"
         spellCheck={false}
-        className="w-full max-w-[13ch] rounded-xl border border-line bg-paper py-3 text-center font-mono text-3xl tracking-[0.12em] uppercase outline-none placeholder:text-line focus:border-ink disabled:opacity-60"
+        className="w-full max-w-[13ch] rounded-xl border border-line bg-paper px-4 py-3 font-mono text-3xl tracking-[0.12em] uppercase outline-none placeholder:text-line focus:border-ink read-only:opacity-60"
       />
       <p aria-live="polite" className={`min-h-5 text-sm ${failed ? 'text-accent' : 'text-muted'}`}>
         {message || (

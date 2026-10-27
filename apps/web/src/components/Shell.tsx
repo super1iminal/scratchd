@@ -12,7 +12,7 @@ export function Shell({ right, children }: { right?: ReactNode; children?: React
         >
           scratchd
         </a>
-        <div className="text-sm text-muted">{right ?? 'end-to-end encrypted · gone in 24h'}</div>
+        <div className="text-sm text-muted">{right}</div>
       </header>
       {children}
     </div>
