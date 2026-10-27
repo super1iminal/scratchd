@@ -24,6 +24,7 @@ export function SharePanel({ creds, startOpen }: { creds: Creds; startOpen: bool
   const [open, setOpen] = useState(() => startOpen || sessionStorage.getItem(shareKey(creds.padId)) !== null);
   const [round, setRound] = useState(0); // bump for a fresh code
   const [share, setShare] = useState<Share | null>(null);
+  const [making, setMaking] = useState(false);
   const [error, setError] = useState('');
   const idleRefreshes = useRef(0);
   const now = useNow(1000);
@@ -34,7 +35,8 @@ export function SharePanel({ creds, startOpen }: { creds: Creds; startOpen: bool
     let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
     const next = () => setRound((r) => r + 1);
-    setShare(null);
+    // The old code stays on screen, dimmed, so the layout doesn't jump while Argon2 runs.
+    setMaking(true);
     setError('');
     const saved = round === 0 ? savedShare(creds.padId) : null;
     (saved ? Promise.resolve(saved) : startSharing(creds)).then(
@@ -42,6 +44,7 @@ export function SharePanel({ creds, startOpen }: { creds: Creds; startOpen: bool
         if (cancelled) return;
         sessionStorage.setItem(shareKey(creds.padId), JSON.stringify(s));
         setShare(s);
+        setMaking(false);
         // A code works once: swap in a fresh one when it's used, burned or expires.
         stop = api.watchChannel(s.channelId, () => ((idleRefreshes.current = 0), next()));
         timer = setTimeout(() => {
@@ -78,10 +81,14 @@ export function SharePanel({ creds, startOpen }: { creds: Creds; startOpen: bool
         ) : (
           <>
             <p className="text-muted">On the other device, enter</p>
-            <output className="font-mono text-4xl font-medium tracking-[0.12em] sm:text-5xl">{formatCode(share.code)}</output>
-            <QR value={`${location.origin}/#c=${share.code}`} />
+            <div className={`flex flex-col items-center gap-5 transition-opacity ${making ? 'opacity-30' : ''}`} aria-busy={making}>
+              <output className="font-mono text-4xl font-medium tracking-[0.12em] sm:text-5xl">{formatCode(share.code)}</output>
+              <QR value={`${location.origin}/#c=${share.code}`} />
+            </div>
             <p className="text-sm text-muted tabular-nums">
-              Refreshes in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+              {making
+                ? error || 'Making a new code…'
+                : `Refreshes in ${Math.floor(secondsLeft / 60)}:${String(secondsLeft % 60).padStart(2, '0')}`}
             </p>
           </>
         )}
