@@ -1,6 +1,6 @@
 import { CHUNK_SIZE, type PadInfo } from '@scratchd/shared';
 import { bytesToHex, hexToBytes } from '@noble/hashes/utils.js';
-import { api } from './mockApi';
+import { api } from './api';
 import { newPadKey, openChunk, openMeta, padKeys, sealChunk, sealMeta, type ItemMeta } from './crypto';
 
 // What a device needs to reach a pad. Kept in sessionStorage: survives a reload of this
@@ -13,7 +13,7 @@ export interface Creds {
 
 export const saveCreds = (c: Creds) => sessionStorage.setItem(`pad:${c.padId}`, JSON.stringify(c));
 export const loadCreds = (padId: string): Creds | null => JSON.parse(sessionStorage.getItem(`pad:${padId}`) ?? 'null');
-export const forgetCreds = (padId: string) => sessionStorage.removeItem(`pad:${padId}`);
+export const forgetCreds = (padId: string) => (sessionStorage.removeItem(`pad:${padId}`), sessionStorage.removeItem(`share:${padId}`));
 
 // Uploads started in this tab, so the pad view can show their errors.
 export const uploads = new Map<string, Promise<void>>();

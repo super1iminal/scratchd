@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/typography';
 
 :root {
   --paper: #f5f4ef;
@@ -50,5 +51,46 @@ body {
 @layer base {
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+/* pdf.js text layer: transparent, selectable text over each page canvas. Copied from the
+   parts of pdfjs-dist/web/pdf_viewer.css we need (the full file is 168 KB of global viewer styles). */
+.textLayer {
+  position: absolute;
+  inset: 0;
+  overflow: clip;
+  line-height: 1;
+  text-align: initial;
+  transform-origin: 0 0;
+  --scale-round-x: 1px;
+  --scale-round-y: 1px;
+  --min-font-size: 1;
+  --text-scale-factor: calc(var(--total-scale-factor) * var(--min-font-size));
+  --min-font-size-inv: calc(1 / var(--min-font-size));
+
+  :is(span, br) {
+    color: transparent;
+    position: absolute;
+    white-space: pre;
+    cursor: text;
+    transform-origin: 0% 0%;
+  }
+  > :not(.markedContent),
+  .markedContent span:not(.markedContent) {
+    --font-height: 0;
+    --scale-x: 1;
+    --rotate: 0deg;
+    font-size: calc(var(--text-scale-factor) * var(--font-height));
+    transform: rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv));
+  }
+  .markedContent {
+    display: contents;
+  }
+  ::selection {
+    background: rgb(0 100 255 / 0.25);
+  }
+  br::selection {
+    background: transparent;
   }
 }

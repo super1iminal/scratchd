@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 import { navigate } from '../lib/ui';
 
-export function Shell({ right, children }: { right?: ReactNode; children?: ReactNode }) {
+export function Shell({ children }: { children?: ReactNode }) {
   return (
-    <div className="flex min-h-dvh flex-col">
-      <header className="flex h-14 shrink-0 items-center justify-between px-5">
+    <div className="flex h-dvh flex-col">
+      <header className="flex h-14 shrink-0 items-center px-5">
         <a
           href="/"
           onClick={(e) => (e.preventDefault(), navigate('/'))}
@@ -12,7 +12,6 @@ export function Shell({ right, children }: { right?: ReactNode; children?: React
         >
           scratchd
         </a>
-        <div className="text-sm text-muted">{right}</div>
       </header>
       {children}
     </div>

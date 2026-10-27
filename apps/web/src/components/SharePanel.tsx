@@ -1,86 +1,94 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import QRCode from 'qrcode';
 import { formatCode } from '../lib/code';
-import type { Creds } from '../lib/pad';
+import { api } from '../lib/api';
+import { endPad, type Creds } from '../lib/pad';
 import { startSharing } from '../lib/pairing';
-import { errorMessage, useNow } from '../lib/ui';
+import { errorMessage, navigate, useNow } from '../lib/ui';
 
+type Share = Awaited<ReturnType<typeof startSharing>>;
+
+// Unused codes refresh this many times, then the panel asks before making more.
+const MAX_IDLE_REFRESHES = 5;
+
+// The live code survives a reload of this tab. It sits next to the pad key, which already
+// grants more than the code does. Its presence also marks a tab that shares this pad.
+const shareKey = (padId: string) => `share:${padId}`;
+const savedShare = (padId: string): Share | null => {
+  const s: Share | null = JSON.parse(sessionStorage.getItem(shareKey(padId)) ?? 'null');
+  return s && s.expiresAt > Date.now() ? s : null;
+};
+
+// The device that made the pad shows a code straight away; a device that joined with one is asked first.
 export function SharePanel({ creds, startOpen }: { creds: Creds; startOpen: boolean }) {
-  const [open, setOpen] = useState(startOpen);
+  const [open, setOpen] = useState(() => startOpen || sessionStorage.getItem(shareKey(creds.padId)) !== null);
   const [round, setRound] = useState(0); // bump for a fresh code
-  const [share, setShare] = useState<{ code: string; expiresAt: number } | null>(null);
-  const [sent, setSent] = useState(false);
-  const [note, setNote] = useState('');
+  const [share, setShare] = useState<Share | null>(null);
+  const [error, setError] = useState('');
+  const idleRefreshes = useRef(0);
   const now = useNow(1000);
 
   useEffect(() => {
     if (!open) return;
     let stop: (() => void) | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     let cancelled = false;
+    const next = () => setRound((r) => r + 1);
     setShare(null);
-    setSent(false);
-    startSharing(creds, (event) => {
-      if (event === 'paired') setSent(true);
-      else if (event === 'wrong') setNote('Someone entered a wrong code.');
-      else {
-        setNote('Too many wrong attempts, so here is a new code.');
-        setRound((r) => r + 1);
-      }
-    }).then(
-      (s) => (cancelled ? s.stop() : ((stop = s.stop), setShare(s))),
-      (e) => setNote(errorMessage(e)),
+    setError('');
+    const saved = round === 0 ? savedShare(creds.padId) : null;
+    (saved ? Promise.resolve(saved) : startSharing(creds)).then(
+      (s) => {
+        if (cancelled) return;
+        sessionStorage.setItem(shareKey(creds.padId), JSON.stringify(s));
+        setShare(s);
+        // A code works once: swap in a fresh one when it's used, burned or expires.
+        stop = api.watchChannel(s.channelId, () => ((idleRefreshes.current = 0), next()));
+        timer = setTimeout(() => {
+          if (++idleRefreshes.current <= MAX_IDLE_REFRESHES) return next();
+          idleRefreshes.current = 0;
+          sessionStorage.removeItem(shareKey(creds.padId));
+          setShare(null);
+          setOpen(false);
+        }, s.expiresAt - Date.now());
+      },
+      (e) => setError(errorMessage(e)),
     );
     return () => {
       cancelled = true;
       stop?.();
+      clearTimeout(timer);
     };
   }, [open, round, creds]);
 
-  const again = () => (setNote(''), setRound((r) => r + 1));
   const secondsLeft = share ? Math.max(0, Math.ceil((share.expiresAt - now) / 1000)) : 0;
 
   return (
-    <section className="panel flex flex-col items-center justify-center gap-5 p-6 text-center">
-      {!open ? (
-        <>
-          <p className="text-muted">Need this on another device?</p>
-          <button className="btn" onClick={() => setOpen(true)}>
-            Share with a code
-          </button>
-        </>
-      ) : sent ? (
-        <>
-          <p className="text-2xl font-semibold tracking-tight">Sent</p>
-          <p className="text-muted">The other device has it now.</p>
-          <button className="btn" onClick={again}>
-            Share with another device
-          </button>
-        </>
-      ) : !share ? (
-        <p className="text-muted">{note || 'Making a code…'}</p>
-      ) : secondsLeft === 0 ? (
-        <>
-          <p className="text-muted">That code expired.</p>
-          <button className="btn" onClick={again}>
-            New code
-          </button>
-        </>
-      ) : (
-        <>
-          <p className="text-muted">
-            On the other device, open <span className="text-ink">{location.host}</span> and enter
-          </p>
-          <output className="font-mono text-4xl font-medium tracking-[0.12em] sm:text-5xl">{formatCode(share.code)}</output>
-          <QR value={`${location.origin}/#c=${share.code}`} />
-          <p aria-live="polite" className="text-sm text-muted">
-            {note || 'Keep this page open until it connects.'}
-            <br />
-            <span className="tabular-nums">
-              Expires in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
-            </span>
-          </p>
-        </>
-      )}
+    <section className="panel flex min-w-0 flex-col">
+      <div className="flex flex-1 flex-col items-center justify-center gap-5 p-6 text-center">
+        {!open ? (
+          <>
+            <p className="text-muted">Need this on another device?</p>
+            <button className="btn" onClick={() => setOpen(true)}>
+              Share with a code
+            </button>
+          </>
+        ) : !share ? (
+          <p className="text-muted">{error || 'Making a code…'}</p>
+        ) : (
+          <>
+            <p className="text-muted">On the other device, enter</p>
+            <output className="font-mono text-4xl font-medium tracking-[0.12em] sm:text-5xl">{formatCode(share.code)}</output>
+            <QR value={`${location.origin}/#c=${share.code}`} />
+            <p className="text-sm text-muted tabular-nums">
+              Refreshes in {Math.floor(secondsLeft / 60)}:{String(secondsLeft % 60).padStart(2, '0')}
+            </p>
+          </>
+        )}
+      </div>
+      <div className="flex justify-end border-t border-line p-3">
+        <DeleteButton creds={creds} />
+      </div>
     </section>
   );
 }
@@ -92,4 +100,26 @@ function QR({ value }: { value: string }) {
   }, [value]);
   // Always dark-on-white: phone cameras don't reliably read inverted codes.
   return <div role="img" aria-label="QR code with the same code" className="size-36 rounded-lg bg-white [&>svg]:size-full" dangerouslySetInnerHTML={{ __html: svg }} />;
+}
+
+function DeleteButton({ creds }: { creds: Creds }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 3000);
+    return () => clearTimeout(t);
+  }, [armed]);
+
+  return (
+    <button
+      className={`btn ${armed ? 'border-accent text-accent' : ''}`}
+      onClick={async () => {
+        if (!armed) return setArmed(true);
+        await endPad(creds);
+        navigate('/');
+      }}
+    >
+      {armed ? 'Confirm' : 'Delete pad'}
+    </button>
+  );
 }

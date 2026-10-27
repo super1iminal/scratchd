@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { MAX_FILE_BYTES } from '@scratchd/shared';
-import { CODE_LENGTH, formatCode, normalizeCode } from '../lib/code';
+import { CODE_LENGTH, MAX_FILE_BYTES } from '@scratchd/shared';
+import { formatCode, normalizeCode } from '../lib/code';
 import { createPad } from '../lib/pad';
 import { joinWithCode } from '../lib/pairing';
 import { errorMessage, navigate } from '../lib/ui';
@@ -137,7 +137,7 @@ function CodeEntry() {
   async function join(c: string) {
     setJoining(true);
     setFailed(false);
-    setMessage('Waiting for the other device…');
+    setMessage('Checking code…');
     try {
       const { padId } = await joinWithCode(c);
       navigate(`/p/${padId}`);

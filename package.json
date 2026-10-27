@@ -2,7 +2,7 @@
   "name": "scratchd",
   "private": true,
   "scripts": {
-    "dev": "pnpm --filter @scratchd/web dev",
+    "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "test": "pnpm -r test"
   },

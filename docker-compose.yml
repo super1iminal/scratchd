@@ -1,0 +1,11 @@
+# Local stand-ins for DynamoDB and S3. Run `docker compose up -d`, then `pnpm dev`.
+services:
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    ports: ["8000:8000"]
+  s3:
+    image: rustfs/rustfs:latest
+    ports: ["9000:9000"]
+    environment:
+      RUSTFS_ACCESS_KEY: scratchd
+      RUSTFS_SECRET_KEY: scratchd-dev

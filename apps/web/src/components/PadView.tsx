@@ -1,14 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { PadEvent, PadInfo } from '@scratchd/shared';
 import type { ItemMeta } from '../lib/crypto';
-import { api } from '../lib/mockApi';
-import { download, endPad, forgetCreds, loadCreds, loadPad, readItem, uploads, type Creds } from '../lib/pad';
-import { errorMessage, formatBytes, navigate, useNow } from '../lib/ui';
+import { api } from '../lib/api';
+import { download, forgetCreds, loadCreds, loadPad, readItem, uploads, type Creds } from '../lib/pad';
+import { previewKind } from '../lib/preview';
+import { errorMessage, formatBytes, useNow } from '../lib/ui';
 import { freshPads } from './Home';
 import { SharePanel } from './SharePanel';
 import { Message, Shell } from './Shell';
-
-const PREVIEW_MAX = 25_000_000;
 
 export function PadView({ padId }: { padId: string }) {
   const creds = useMemo(() => loadCreds(padId), [padId]);
@@ -19,12 +18,15 @@ export function PadView({ padId }: { padId: string }) {
 
   useEffect(() => {
     if (!creds) return;
-    loadPad(creds).then(setPad, () => setGone('This pad has ended or expired.'));
-    uploads.get(padId)?.catch((e) => setUploadError(errorMessage(e)));
-    return api.subscribe(`pad:${padId}`, (e: PadEvent) => {
+    loadPad(creds).then(setPad, () => setGone('This pad was deleted or has expired.'));
+    uploads.get(padId)?.then(
+      () => setPad((p) => p && { ...p, info: { ...p.info, uploaded: p.info.chunks } }), // don't wait for the next poll
+      (e) => setUploadError(errorMessage(e)),
+    );
+    return api.watchPad(padId, creds.token, (e: PadEvent) => {
       if (e.type === 'ended') {
         forgetCreds(padId);
-        setGone('This pad was ended.');
+        setGone('This pad was deleted.');
       } else setPad((p) => p && { ...p, info: { ...p.info, uploaded: e.uploaded! } });
     });
   }, [creds, padId]);
@@ -35,34 +37,43 @@ export function PadView({ padId }: { padId: string }) {
 
   const minutes = Math.max(0, Math.floor((pad.info.expiresAt - now) / 60_000));
   return (
-    <Shell right={`${Math.floor(minutes / 60)}h ${minutes % 60}m left`}>
-      <main className="grid flex-1 gap-3 p-3 pt-0 md:grid-cols-2">
-        <Item creds={creds} info={pad.info} meta={pad.meta} uploadError={uploadError} />
+    <Shell>
+      <main className="grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] gap-3 p-3 pt-0 md:grid-cols-2 md:grid-rows-[minmax(0,1fr)]">
+        <Item creds={creds} info={pad.info} meta={pad.meta} uploadError={uploadError} left={`${Math.floor(minutes / 60)}h ${minutes % 60}m left`} />
         <SharePanel creds={creds} startOpen={freshPads.has(padId)} />
       </main>
     </Shell>
   );
 }
 
-function Item({ creds, info, meta, uploadError }: { creds: Creds; info: PadInfo; meta: ItemMeta; uploadError: string }) {
+function Item({ creds, info, meta, uploadError, left }: { creds: Creds; info: PadInfo; meta: ItemMeta; uploadError: string; left: string }) {
   const ready = info.uploaded === info.chunks;
-  const isText = meta.kind === 'text';
-  const isImage = meta.type.startsWith('image/');
+  const kind = previewKind(meta);
   const [blob, setBlob] = useState<Blob | null>(null);
   const [text, setText] = useState<string | null>(null);
-  const [imageUrl, setImageUrl] = useState('');
+  const [html, setHtml] = useState('');
+  const [url, setUrl] = useState('');
   const [status, setStatus] = useState('');
 
   useEffect(() => {
-    if (!ready || !(isText || isImage) || meta.size > PREVIEW_MAX) return;
-    let url = '';
+    if (!ready || !kind) return;
+    let objectUrl = '';
     readItem(creds, info, meta).then(async (b) => {
       setBlob(b);
-      if (isText) setText(await b.text());
-      else setImageUrl((url = URL.createObjectURL(b)));
+      if (kind === 'text' || kind === 'markdown') {
+        const t = await b.text();
+        setText(t);
+        if (kind === 'markdown') {
+          const [{ marked }, { default: DOMPurify }] = await Promise.all([import('marked'), import('dompurify')]);
+          setHtml(DOMPurify.sanitize(await marked.parse(t)));
+        }
+      }
+      else if (kind !== 'pdf') setUrl((objectUrl = URL.createObjectURL(b)));
     }, (e) => setStatus(errorMessage(e)));
-    return () => URL.revokeObjectURL(url);
+    return () => URL.revokeObjectURL(objectUrl);
   }, [ready]);
+
+  const canCopy = text !== null || (kind === 'image' && !!url);
 
   async function copy() {
     try {
@@ -86,13 +97,13 @@ function Item({ creds, info, meta, uploadError }: { creds: Creds; info: PadInfo;
   }
 
   return (
-    <section className="panel flex min-h-72 min-w-0 flex-col">
+    <section className="panel flex min-h-0 min-w-0 flex-col">
       <div className="flex items-baseline justify-between gap-3 border-b border-line px-5 py-3">
-        <span className="truncate font-medium">{isText ? 'Text' : meta.name}</span>
+        <span className="truncate font-medium">{meta.kind === 'text' ? 'Text' : meta.name}</span>
         <span className="shrink-0 text-sm text-muted tabular-nums">{formatBytes(meta.size)}</span>
       </div>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-5">
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-auto p-5 [scrollbar-width:thin]">
         {uploadError ? (
           <p className="text-accent">Upload failed: {uploadError}</p>
         ) : !ready ? (
@@ -102,31 +113,83 @@ function Item({ creds, info, meta, uploadError }: { creds: Creds; info: PadInfo;
             </div>
             <p className="mt-3 text-sm text-muted">Encrypting and uploading…</p>
           </div>
+        ) : html ? (
+          <div className="prose prose-neutral dark:prose-invert prose-code:before:content-none prose-code:after:content-none w-full max-w-none self-start" dangerouslySetInnerHTML={{ __html: html }} />
         ) : text !== null ? (
           <pre className="w-full self-start font-mono text-sm break-words whitespace-pre-wrap">{text}</pre>
-        ) : imageUrl ? (
-          <img src={imageUrl} alt={meta.name} className="max-h-[60vh] max-w-full rounded-lg object-contain" />
+        ) : url && kind === 'image' ? (
+          <img src={url} alt={meta.name} className="max-h-[60vh] max-w-full rounded-lg object-contain" />
+        ) : blob && kind === 'pdf' ? (
+          <PdfPages blob={blob} onError={() => setStatus("Couldn't preview this PDF. Try Download.")} />
+        ) : url && kind === 'video' ? (
+          <video src={url} controls className="max-h-[60vh] max-w-full rounded-lg" />
+        ) : url && kind === 'audio' ? (
+          <audio src={url} controls className="w-full" />
         ) : (
           <p className="font-mono text-sm text-muted">{meta.type || 'file'}</p>
         )}
       </div>
 
       <div className="flex flex-wrap items-center gap-2 border-t border-line p-3">
-        {(text !== null || imageUrl) && (
+        {canCopy && (
           <button className="btn-primary" onClick={copy}>
             Copy
           </button>
         )}
-        <button className={text !== null || imageUrl ? 'btn' : 'btn-primary'} onClick={save} disabled={!ready}>
+        <button className={canCopy ? 'btn' : 'btn-primary'} onClick={save} disabled={!ready}>
           Download
         </button>
         <span aria-live="polite" className="text-sm text-muted">
           {status}
         </span>
-        <EndButton creds={creds} />
+        <span className="ml-auto pr-2 text-sm text-muted tabular-nums">{left}</span>
       </div>
     </section>
   );
+}
+
+// pdf.js (~1.5 MB with its worker) loads only when a PDF is previewed.
+// shortcut: renders every page up front; render on scroll if long PDFs feel slow.
+function PdfPages({ blob, onError }: { blob: Blob; onError: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const box = ref.current!;
+    let cancelled = false;
+    let destroy = () => {};
+    (async () => {
+      const [pdfjs, { default: workerSrc }] = await Promise.all([import('pdfjs-dist'), import('pdfjs-dist/build/pdf.worker.min.mjs?url')]);
+      pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+      const task = pdfjs.getDocument({ data: new Uint8Array(await blob.arrayBuffer()) });
+      destroy = () => void task.destroy();
+      const pdf = await task.promise;
+      for (let i = 1; i <= pdf.numPages && !cancelled; i++) {
+        const page = await pdf.getPage(i);
+        const scale = box.clientWidth / page.getViewport({ scale: 1 }).width;
+        const viewport = page.getViewport({ scale });
+        const dpr = devicePixelRatio;
+        const wrap = document.createElement('div');
+        wrap.className = 'relative overflow-hidden rounded-md bg-white shadow-sm';
+        wrap.style.setProperty('--total-scale-factor', String(scale));
+        wrap.setAttribute('aria-label', `Page ${i} of ${pdf.numPages}`);
+        const canvas = document.createElement('canvas');
+        canvas.width = Math.floor(viewport.width * dpr);
+        canvas.height = Math.floor(viewport.height * dpr);
+        canvas.className = 'block w-full';
+        const text = document.createElement('div');
+        text.className = 'textLayer';
+        wrap.append(canvas, text);
+        box.append(wrap);
+        await page.render({ canvas, viewport, transform: [dpr, 0, 0, dpr, 0, 0] }).promise;
+        await new pdfjs.TextLayer({ textContentSource: page.streamTextContent(), container: text, viewport }).render();
+      }
+    })().catch(() => !cancelled && onError());
+    return () => {
+      cancelled = true;
+      destroy();
+      box.replaceChildren();
+    };
+  }, [blob]);
+  return <div ref={ref} role="document" className="flex w-full flex-col gap-3 self-start" />;
 }
 
 // Clipboard images must be PNG. Passing a promise keeps Safari's user-gesture check happy.
@@ -138,26 +201,4 @@ async function toPng(blob: Blob): Promise<Blob> {
   canvas.height = img.height;
   canvas.getContext('2d')!.drawImage(img, 0, 0);
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject()), 'image/png'));
-}
-
-function EndButton({ creds }: { creds: Creds }) {
-  const [armed, setArmed] = useState(false);
-  useEffect(() => {
-    if (!armed) return;
-    const t = setTimeout(() => setArmed(false), 3000);
-    return () => clearTimeout(t);
-  }, [armed]);
-
-  return (
-    <button
-      className={`btn ml-auto ${armed ? 'border-accent text-accent' : ''}`}
-      onClick={async () => {
-        if (!armed) return setArmed(true);
-        await endPad(creds);
-        navigate('/');
-      }}
-    >
-      {armed ? 'Delete for everyone?' : 'End pad'}
-    </button>
-  );
 }

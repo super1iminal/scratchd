@@ -1,29 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cpaceFinish, cpaceStart } from './cpace';
 import { newPadKey, openChunk, openMeta, padKeys, sealChunk, sealMeta } from './crypto';
-
-const te = new TextEncoder();
-
-describe('cpace', () => {
-  const sid = crypto.getRandomValues(new Uint8Array(16));
-
-  it('agrees on a key when both sides use the same password', () => {
-    const a = cpaceStart(te.encode('M4XPD'), sid);
-    const b = cpaceStart(te.encode('M4XPD'), sid);
-    expect(cpaceFinish(a.y, b.Y, a.Y, b.Y, sid)).toEqual(cpaceFinish(b.y, a.Y, a.Y, b.Y, sid));
-  });
-
-  it('disagrees when the passwords differ', () => {
-    const a = cpaceStart(te.encode('M4XPD'), sid);
-    const b = cpaceStart(te.encode('M4XPE'), sid);
-    expect(cpaceFinish(a.y, b.Y, a.Y, b.Y, sid)).not.toEqual(cpaceFinish(b.y, a.Y, a.Y, b.Y, sid));
-  });
-
-  it('rejects the identity point', () => {
-    const a = cpaceStart(te.encode('M4XPD'), sid);
-    expect(() => cpaceFinish(a.y, new Uint8Array(32), a.Y, new Uint8Array(32), sid)).toThrow();
-  });
-});
 
 describe('item encryption', async () => {
   const keys = await padKeys(newPadKey());

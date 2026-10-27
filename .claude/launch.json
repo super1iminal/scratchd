@@ -4,8 +4,24 @@
     {
       "name": "web",
       "runtimeExecutable": "C:/Program Files/nodejs/node.exe",
-      "runtimeArgs": ["apps/web/node_modules/vite/bin/vite.js", "apps/web", "--port", "5173", "--strictPort"],
+      "runtimeArgs": [
+        "apps/web/node_modules/vite/bin/vite.js",
+        "apps/web",
+        "--port",
+        "5173",
+        "--strictPort"
+      ],
       "port": 5173
+    },
+    {
+      "name": "server",
+      "runtimeExecutable": "C:/Program Files/nodejs/node.exe",
+      "runtimeArgs": [
+        "--watch",
+        "--env-file=apps/server/.env.dev",
+        "apps/server/src/main.ts"
+      ],
+      "port": 3000
     }
   ]
 }
