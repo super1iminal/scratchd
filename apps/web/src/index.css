@@ -1,0 +1,54 @@
+@import 'tailwindcss';
+
+:root {
+  --paper: #f5f4ef;
+  --raised: #fdfcf9;
+  --ink: #1b1b19;
+  --muted: #6c6a63;
+  --line: #d9d6cc;
+  --accent: #c9361a;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #121211;
+    --raised: #1a1a18;
+    --ink: #ebeae4;
+    --muted: #8e8c85;
+    --line: #2e2d2a;
+    --accent: #ff6b4a;
+  }
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-raised: var(--raised);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Mono', Consolas, monospace;
+}
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@utility panel {
+  @apply rounded-2xl border border-line bg-raised;
+}
+@utility btn {
+  @apply inline-flex h-10 items-center justify-center rounded-lg border border-line px-4 text-sm font-medium transition-colors hover:border-ink disabled:pointer-events-none disabled:opacity-40;
+}
+@utility btn-primary {
+  @apply btn border-ink bg-ink text-paper hover:opacity-85;
+}
+
+@layer base {
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
