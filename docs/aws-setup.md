@@ -39,7 +39,18 @@ URLs are same-origin and need no CORS.
 ## Network
 - ALB security group: inbound only from the managed prefix list `com.amazonaws.global.cloudfront.origin-facing`, so nobody can skip WAF.
 
+## ECR and GitHub Actions
+- ECR repository `scratchd`, tag mutability mutable (the workflow moves `latest`); lifecycle rule: keep the last 10 images.
+- IAM identity provider: OpenID Connect, URL `https://token.actions.githubusercontent.com`, audience `sts.amazonaws.com`.
+- IAM role for GitHub: trusted by that provider with conditions `token.actions.githubusercontent.com:aud` = `sts.amazonaws.com`
+  and `token.actions.githubusercontent.com:sub` = `repo:super1iminal/scratchd:ref:refs/heads/main`.
+  Permissions: `ecr:GetAuthorizationToken` on `*`; `ecr:BatchCheckLayerAvailability`, `ecr:InitiateLayerUpload`,
+  `ecr:UploadLayerPart`, `ecr:CompleteLayerUpload`, `ecr:PutImage`, `ecr:BatchGetImage` on the repository ARN.
+- GitHub repo, Settings > Secrets and variables > Actions > Variables: `AWS_ROLE_ARN`, `AWS_REGION`, `ECR_REPOSITORY` (`scratchd`).
+- After a push, deploy with ECS "Update service" > "Force new deployment" (the task definition uses `:latest`).
+
 ## ECS
+- Image: `<account>.dkr.ecr.<region>.amazonaws.com/scratchd:latest`.
 - Task role: `dynamodb:GetItem`, `PutItem`, `UpdateItem`, `DeleteItem` on the table; `s3:PutObject`, `s3:AbortMultipartUpload`,
   `s3:ListMultipartUploadParts`, `s3:DeleteObject` on `arn:aws:s3:::scratchd/pads/*`.
 - Execution role: the usual ECR and logs access, plus `ssm:GetParameters` on the parameter's ARN.
