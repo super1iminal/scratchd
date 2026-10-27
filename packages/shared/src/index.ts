@@ -7,7 +7,8 @@ export const MAX_FILE_BYTES = 1024 ** 3;
 // Plaintext bytes per encrypted chunk; one chunk = one S3 multipart part (min 5 MiB).
 export const CHUNK_SIZE = 8 * 1024 * 1024;
 export const SEALED_CHUNK_SIZE = CHUNK_SIZE + 16; // + AES-GCM tag
-export const MAX_JOIN_FAILURES = 3;
+export const MAX_CODE_TRIES = 3; // a wrong third try burns the code
+export const MAX_DEVICES = 20; // per pad; keeps its DynamoDB row far under the 400 KB limit
 
 // Pairing codes: 8 chars from an alphabet without look-alikes (no 0/O, 1/I/L, U).
 // The first 3 chars name the server-side channel; the last 5 are a secret that never leaves the devices.

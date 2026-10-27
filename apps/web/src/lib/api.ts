@@ -39,9 +39,8 @@ export const api: Api = {
   async putChunk(padId, token, index, data) {
     const { url } = await call<{ url: string }>('GET', `/pads/${padId}/parts/${index}/url`, undefined, token);
     const res = await fetch(url, { method: 'PUT', body: data as Uint8Array<ArrayBuffer> });
-    const etag = res.headers.get('etag');
-    if (!res.ok || !etag) throw new Error(`Upload failed (${res.status})`);
-    await call('POST', `/pads/${padId}/parts/${index}`, { etag }, token);
+    if (!res.ok) throw new Error(`Upload failed (${res.status})`);
+    await call('POST', `/pads/${padId}/parts/${index}`, undefined, token);
   },
 
   getPad: (padId, token) => call('GET', `/pads/${padId}`, undefined, token),

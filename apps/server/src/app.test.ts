@@ -1,5 +1,6 @@
 import { beforeAll, expect, it } from 'vitest';
 import { randomBytes } from 'node:crypto';
+import { MAX_DEVICES } from '@scratchd/shared';
 import { buildApp } from './app.ts';
 import { ensureDevResources } from './aws.ts';
 
@@ -25,7 +26,7 @@ it('uploads, downloads, pairs and deletes a pad', async () => {
   const { body: part } = await api('GET', `/pads/${padId}/parts/0/url`, undefined, token);
   const put = await fetch(part.url, { method: 'PUT', body: sealed });
   expect(put.ok).toBe(true);
-  expect((await api('POST', `/pads/${padId}/parts/0`, { etag: put.headers.get('etag') }, token)).status).toBe(204);
+  expect((await api('POST', `/pads/${padId}/parts/0`, undefined, token)).status).toBe(204);
   expect((await api('GET', `/pads/${padId}`, undefined, token)).body.uploaded).toBe(1);
 
   const { body: dl } = await api('GET', `/pads/${padId}/url`, undefined, token);
@@ -52,6 +53,52 @@ it('burns a code after three wrong tries', async () => {
   for (let i = 0; i < 3; i++) expect((await api('POST', `/channels/${chan.channelId}/claim`, { verifier: 'b'.repeat(64) })).status).toBe(403);
   expect((await api('GET', `/channels/${chan.channelId}`)).body.status).toBe('burned');
   expect((await api('POST', `/channels/${chan.channelId}/claim`, { verifier })).status).toBe(404);
+});
+
+it('checks at most three guesses even when they arrive together', async () => {
+  const { padId, token } = await newPad();
+  const { body: chan } = await api('POST', `/pads/${padId}/channels`, channelBody('a'.repeat(64)), token);
+  const statuses = await Promise.all(Array.from({ length: 10 }, () => api('POST', `/channels/${chan.channelId}/claim`, { verifier: 'b'.repeat(64) }).then((r) => r.status)));
+  expect(statuses.filter((s) => s === 403)).toHaveLength(3);
+  expect((await api('GET', `/channels/${chan.channelId}`)).body.status).toBe('burned');
+});
+
+it('throws away an upload whose part is the wrong size', async () => {
+  const { padId, token } = await newPad(); // declares 10 bytes, so the sealed part must be 26
+  const { body: part } = await api('GET', `/pads/${padId}/parts/0/url`, undefined, token);
+  await fetch(part.url, { method: 'PUT', body: randomBytes(27) });
+  expect((await api('POST', `/pads/${padId}/parts/0`, undefined, token)).status).toBe(400);
+  expect((await api('GET', `/pads/${padId}`, undefined, token)).status).toBe(404);
+});
+
+it("replaces a device's previous code but not other devices' codes", async () => {
+  const { padId, token } = await newPad();
+  const open = async (t: string) => (await api('POST', `/pads/${padId}/channels`, channelBody('a'.repeat(64)), t)).body.channelId as string;
+  const first = await open(token);
+  const claimed = (await api('POST', `/channels/${first}/claim`, { verifier: 'a'.repeat(64) })).body.token;
+  const second = await open(token);
+  const other = await open(claimed);
+  const third = await open(token);
+  expect((await api('GET', `/channels/${first}`)).status).toBe(404);
+  expect((await api('GET', `/channels/${second}`)).status).toBe(404);
+  expect((await api('GET', `/channels/${other}`)).body.status).toBe('open');
+  expect((await api('GET', `/channels/${third}`)).body.status).toBe('open');
+});
+
+it('stops adding devices at the cap', async () => {
+  const { padId, token } = await newPad();
+  const join = async () => {
+    const { body: chan } = await api('POST', `/pads/${padId}/channels`, channelBody('a'.repeat(64)), token);
+    return (await api('POST', `/channels/${chan.channelId}/claim`, { verifier: 'a'.repeat(64) })).status;
+  };
+  for (let i = 1; i < MAX_DEVICES; i++) expect(await join()).toBe(200);
+  expect(await join()).toBe(409);
+});
+
+it('sends security headers', async () => {
+  const res = await app.inject({ method: 'GET', url: '/api/health' });
+  expect(res.headers['content-security-policy']).toContain("default-src 'self'");
+  expect(res.headers['x-content-type-options']).toBe('nosniff');
 });
 
 it('rejects wrong tokens and bad input', async () => {

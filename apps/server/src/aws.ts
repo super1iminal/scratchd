@@ -17,6 +17,10 @@ export const s3 = new S3Client(env.S3_ENDPOINT ? { endpoint: env.S3_ENDPOINT, fo
 // Dev in Docker: the browser reaches the S3 stand-in on a different host than the server does.
 const s3ForBrowser = env.S3_PUBLIC_ENDPOINT ? new S3Client({ endpoint: env.S3_PUBLIC_ENDPOINT, forcePathStyle: true, ...checksums }) : s3;
 
+// Where the browser sends and fetches file bytes, for the page's Content-Security-Policy.
+const browserEndpoint = env.S3_PUBLIC_ENDPOINT ?? env.S3_ENDPOINT;
+export const fileOrigin = env.CLOUDFRONT_DOMAIN ? `https://${env.CLOUDFRONT_DOMAIN}` : browserEndpoint ? new URL(browserEndpoint).origin : 'https://*.amazonaws.com';
+
 // Browser-facing URL for one upload part (when `part` is given) or for reading the object.
 // Production goes through CloudFront (OAC signs the request on to S3); dev signs straight to RustFS.
 export function signedUrl(key: string, part?: { uploadId: string; partNumber: number }): Promise<string> {
@@ -53,11 +57,11 @@ export async function ensureDevResources() {
   await s3.send(new CreateBucketCommand({ Bucket: BUCKET })).catch((e) => {
     if (!(e instanceof BucketAlreadyOwnedByYou)) throw e;
   });
-  // Same CORS rule the real bucket needs: the browser PUTs parts, reads ETags, and GETs byte ranges.
+  // The browser PUTs parts and GETs byte ranges. Production allows only the site's own origin.
   await s3.send(
     new PutBucketCorsCommand({
       Bucket: BUCKET,
-      CORSConfiguration: { CORSRules: [{ AllowedOrigins: ['*'], AllowedMethods: ['GET', 'PUT'], AllowedHeaders: ['*'], ExposeHeaders: ['ETag'], MaxAgeSeconds: 3600 }] },
+      CORSConfiguration: { CORSRules: [{ AllowedOrigins: ['*'], AllowedMethods: ['GET', 'PUT'], AllowedHeaders: ['*'], MaxAgeSeconds: 3600 }] },
     }),
   );
 }
