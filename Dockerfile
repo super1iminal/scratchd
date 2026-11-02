@@ -1,5 +1,5 @@
 # One image: the Fastify API plus the built web app it serves.
-FROM node:24-alpine AS base
+FROM node:26-alpine AS base
 WORKDIR /app
 RUN corepack enable
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
