@@ -13,7 +13,7 @@
     "@noble/hashes": "^2.4.0",
     "@scratchd/shared": "workspace:*",
     "dompurify": "^3.4.17",
-    "marked": "^18.1.1",
+    "marked": "^18.1.2",
     "pdfjs-dist": "^6.4.299",
     "qrcode": "^1.5.4",
     "react": "^19.3.1",
